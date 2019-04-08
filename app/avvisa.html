@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Protezione Civile</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+  	<meta name="viewport" content="width=device-width, initial-scale=1">
+  	<link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+  	<!-- librerie di jQuery -->
+  	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+  	<!-- librerie di Bootstrap -->
+  	<script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+  	<!-- librerie per le mappe -->
+    <script src="https://maps.googleapis.com/maps/api/js?libraries=places&key=AIzaSyCzUI8LYmnHPyFrtRT8Q8IEREZfOygUl-U"></script>
+  	<!-- librerie per le socket.io -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.dev.js"></script>
+    
+    <!-- necessaria per le mappe altrimenti le mappe non vengono visualizzate -->
+    <style>
+      .classMap { height: 400px }  
+    </style>
+    
+    <script>
+    
+      	$(document).ready(function(){
+
+      	    var pos; // coordinate geografiche
+      	    var address; // indirizzo corrispondente alle coordinate geografiche
+      	    // mappa su cui vengono visualizzate le emergenze
+            var map4 = new google.maps.Map($("#map4")[0], { 
+        		zoom: 12
+    		});
+      	    
+      	    // connessione al server
+      	    var socket = io(); 
+        		
+        	// il bottone pe rl asegnalazione di emergenza viene nascosto fina a quando non ci si geolocalizza
+      	    $("#segnala").hide();
+
+            // geolocalizzazione
+            $("#geolocalizza").click(function(){
+                // chiamata al servizio di geolocalizzazione
+            	navigator.geolocation.getCurrentPosition(function(position) {
+                    // estrazione della posizione
+                    pos = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    // posizionamento della mappa sulla posizione
+                    map4.setCenter(pos);
+                    // visualizzazione del marker nelal posizone in cui il volontario si trova
+                    var marker = new google.maps.Marker({
+    					position: pos,
+    					map: map4,
+    					title: 'La tua posizione',
+    					label: 'V' // la lettera 'V' segnala il volontario, 'E' l'emergenza
+  					});
+  					// visualizzazione delle coordinate
+                    $("#latlng4").text(marker.getPosition());
+                    
+                    // determinazione dell'indirizzo corrispondente alle coordinate
+                    
+                    var geocoder = new google.maps.Geocoder;
+                    var infowindow = new google.maps.InfoWindow;
+                    
+                    geocoder.geocode({'location': marker.getPosition()}, function(results, status) {
+                      if (status === 'OK') {
+                        if (results[0]) { // è stata trovata almeno una corrispondenza
+                          // salvo l'indirizzo in address - variabile globale
+                          address = results[0].formatted_address;
+                          // setto le proprietà dell'infowindows
+                          infowindow.setContent(results[0].formatted_address);
+                          infowindow.open(map4, marker);
+                          // visualizzo l'indirizzo
+                          $("#address4").text(results[0].formatted_address);
+                        } else {
+                          window.alert('No results found');
+                        }
+                      } else {
+                        window.alert('Geocoder failed due to: ' + status);
+                      }
+                    });
+                    // rendo visibile il bottone per segnalare le emergenze
+                    $("#segnala").show();
+    			});	
+            });  
+            
+            $("#segnala").click(function(){
+                // parte del software che permette ad un volontario di segnalare un'emergenza
+                socket.emit('segnalazione', {address : address, socket : socket.id, position : pos});
+                // scrivere il codice per avvisare tutti gli addetti collegati che c'è un'emergenza in corso
+                // alle coordiante/indirizzo in cui si trova il volontario
+                // prestare attenzione a quali informazioni devono essere inviate e quindi 
+                // al formato JSON per l'invio
+
+            });
+            
+            socket.on('segnalazione', function(msg){
+                // parte del software che permette al volontario di ricevere le segnalazioni degli altri volontari
+                 $('#messages').append($('<li>').text(msg));
+                 var marker = new google.maps.Marker({
+    					position: msg.position,
+    					map: map4,
+    					title: msg.socket,
+    					label: 'E' // la lettera 'V' segnala il volontario, 'E' l'emergenza
+  					});
+                // scrivere il codice per visualizzare un marker alla posizone presente nel messaggio
+                // il marker deve avere la lettera 'E'
+                // prestare attenzione a quali informazioni sono state inviate nella funzione precedente 
+            });
+        
+		});
+		
+		
+    </script>
+  </head>
+  
+  <body>
+  <div class="container-fluid">
+    <div class="row">
+        <div class="col-sm-1" > &nbsp</div>
+    	<div class="col-sm-7" ><h2>Servizio segnalazione emergenze</h2></div>
+    	<div class="col-sm-3" >&nbsp</div>
+    	<div class="col-sm-1" >&nbsp</div>
+	</div>
+    <div class="row">
+        <div class="col-sm-1" >&nbsp</div>
+    	<div class="col-sm-7" >&nbsp</div>
+    	<div class="col-sm-3" >&nbsp</div>
+    	<div class="col-sm-1" >&nbsp</div>
+	</div>
+    <div class="row">
+        <div class="col-sm-1" > &nbsp</div>
+    	<div class="col-sm-7 classMap" id=map4></div>
+    	<div class="col-sm-3" >
+    	   <button type="button" class="btn btn-primary" id=geolocalizza>Geolocalizzazione</button>
+    	   <br>
+    	   <br>Coordinate:
+    	   <br><div id=latlng4></div>
+    	   <br>Indirizzo:
+       	   <br><div id=address4></div> 	 
+           <br><button type="button" class="btn btn-danger" id=segnala>Segnala emergenza</button>
+       	   <br><div id=emergenze></div> 	 
+    	</div>
+        <div class="col-sm-1" >&nbsp</div>
+	</div>
+     <div class="row">
+        <div class="col-sm-1" >&nbsp</div>
+    	<div class="col-sm-7" ><ul id="messages"></ul></div>
+    	<div class="col-sm-3" >&nbsp</div>
+    	<div class="col-sm-1" >&nbsp</div>
+	</div>
+  </body>
+</html>
