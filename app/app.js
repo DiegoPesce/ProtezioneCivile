@@ -94,7 +94,7 @@ io.on('connection', function(socket){ // gestisce le connessioni
         db.close();
       })
     });
-
+ 
     // scrivere il codice per visualizzare su console le informazioni ricevute
     // e per spedire la segnalazione a tutti i volontari connessi ad eccezione del mittente
   });
